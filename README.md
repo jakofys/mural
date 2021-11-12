@@ -15,15 +15,15 @@ go get -u github.com/jakofys/mural
 
 ## Features
 
-- [] Description as Code
-    - [] Command description
-    - [] Flag description
-    - [] Variable
-    - [] Environment variable
-- [] Code own CLI
-- [] Extensible flag logic
-- [] Subcommand supports
-- [] Autocompletion command line
+- [ ] Description as Code
+    - [ ] Command description
+    - [ ] Flag description
+    - [ ] Variable
+    - [ ] Environment variable
+- [ ] Code own CLI
+- [ ] Extensible flag logic
+- [ ] Subcommand supports
+- [ ] Autocompletion command line
 
 ## Use
 
