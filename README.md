@@ -180,7 +180,7 @@ cli.RegisterFlagExtractor(&StringFlag{})
 You can also create a documentation file use specific language to descibe your entirely application with:
 
 ```go
-cli := mural.From(io.Reader) // Output a cli importing file description
+cli, err := mural.From(io.Reader) // Output a cli importing file description
 ```
 
 Then in this content, we have:
