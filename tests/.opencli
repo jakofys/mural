@@ -1,0 +1,26 @@
+@head:
+    version: 1.12.3-alpha+6f8ca4bfb2
+    name: myapp
+    description: A simple application
+    
+@commands:
+
+    command command2 [arg1] [?arg2] --flag1 --flag2
+    > Command description has coming soon
+
+    command command2 [arg1] command3 [arg2] -f1 -f2
+    > Command for deleguate to next command value
+
+    command [arg1...]
+    > Command for deleguate to next command value
+
+@flags:
+
+    flag1 | f1: string='message'
+    > Flag one description as string
+
+    unflag : string='message'
+    > Flag simple with no desc
+
+    flag2 | f2: bool=true
+    > Flag two description as boolean with true as default value

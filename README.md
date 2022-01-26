@@ -1,8 +1,8 @@
 # Mural
 
 Mural is a CLI library write in go allow you to implement CLI logic on your go application.
-It use multiple pattern to describe how a CLI can be work.
-Must usefull feature of Mural is **Description as Code** pattern that allow you to just describe your command and tag as a simple documentation (as help common command can do) and Mural, from the description, can construct you command logic.
+Mural implement multiple way to handle CLI logic in your application.
+Must usefull feature of Mural is **Description as Code** pattern. Describe your command and tag as a simple documentation (as help common command can do) and Mural, from the description, can construct you command logic.
 Any code need, just description!!!
 
 ## Installation
@@ -13,6 +13,8 @@ Make only a go get command:
 go get -u github.com/jakofys/mural
 ```
 
+And it ready to be used
+
 ## Features
 
 - [ ] Description as Code
@@ -20,6 +22,8 @@ go get -u github.com/jakofys/mural
     - [ ] Flag description
     - [ ] Variable
     - [ ] Environment variable
+- [ ] Decode from args and flags
+- [ ] Command line pipeline from file
 - [ ] Code own CLI
 - [ ] Extensible flag logic
 - [ ] Subcommand supports
@@ -30,18 +34,28 @@ go get -u github.com/jakofys/mural
 ### Create command
 
 Initialize basic information about CLI application as:
+Mural can support semantic version, and is recommended to use version to enable to use `-v` or `--version` flag to know version of the CLI application. (see [semantic version standard](https://semver.org))
 
 ```go
-version := ParseVersion("1.12.3-alpha")
-cli := NewCLI("myapp", version, "A simple application")
+cli,err := mural.NewCLI("myapp", "1.12.3-alpha+6f8ca4bfb2", "A simple application")
+if err != nil{
+    panic(err)
+}
 ```
 
-> CLI supports semantic version pattern
+As see before, you can have some keyword flag already blocked by default, see keyword references [here](#keywords-references).
 
-And just add a command like:
+At this step, use of `-v` return given output on standard output:
+
+```
+myapp 1.12.3-alpha+6f8ca4bfb2 (arm64)
+```
+
+You can know add a new command handler.
+You have to **implement** `mural.CommandHandler` interface to be capable of handle a command.
 
 ```go
-cli.AddCommand(
+mural.AddCommands(
     &Command{
         Name: "hello",
         Description: "This command get a hello world",
@@ -50,60 +64,79 @@ cli.AddCommand(
 )
 ```
 
-Then implement `CommandHandler` to create a handler function:
+Then implement `CommandHandler` to handle incomming command:
 
 ```go
-func HelloCommandHandler (cmd Command, args map[string]Argument, flags map[string]Flag){
+func HelloCommandHandler (args *Args, flags *Flags)error{
     fmt.Print("Hellow world")
+    return nil
 }
 ```
+
+>  `CommandHandlerFunc` is a function signature that implement `CommandHandler` interface
+
+The `args` and `flags` input reflect all values use in command line. 
+It allow to reach data using `index` or `tagname` according to how to describe your command.
+It have `Decode` method that apply all value to a `struct` that use `mural` tagname. (see [here](#args-and-flags-decode) how it works).
 
 Don't forget to specify to CLI to build is intern logic using:
 
 ```go
-_, err := cli.Build()
+_, err := cli.Compile()
 ```
 
-> This function allow cli to build logic with given ressources, and (par conséquent) locked ressources access. You cannot neither adding or removing, neither changing ressources behaviour. <br>
-It returns error if exist duplication, no sense logic or missing informations. 
+It needed to `Compile` the CLI that construct **schema** and defined all scenarios about command, subcommand, optional and required flags and args
+(see [architecture]() of build).
+It create a file named by default `<myapp.cli>` containing op-code for cli. It will be modify when CLI resources changed.
+> Op-code file can be renamed using `cli.SetCachePath(mypath)`.
 
-Finally for start running CLI, just make:
+> This function compile given information, so after called `Compile`, you cannot neither adding or removing, neither changing ressources behaviour. <br>
+Can returns error if duplicated resources found, none sense logic retrieve or missing informations. 
+
+Finally for start running CLI, you can use multiple ways.
+The first is the common way to handle input, can use standard input from `os.Args` value (see [os](https://pkg.go.dev/os) library)
+
+<!-- Explain the signature and add new signature for stream input -->
 
 ```go
 cli.Run(os.Args)
 ```
 
+> It use `strings.Join` and pass the result to `cli.RunString`
+
+Another way is to use stream the input as `os.Stdin` or another `os.Reader` can do using following methods:
+
+```go
+cli.RunStream(os.Stdin)
+```
+
+Mural use `EOL` as separator between command line, and a `EOF` stop running instruction.
+With it, you can chain multiple command line in stream.
+
 We can run this application to making:
 
 ```bash
-myapp hello # Output 'Hello world!'
+./myapp hello # Output 'Hello world!'
 ```
 
 ## Description as Code
 
-You have three way to declare command, the first, we saw it in previous chapter as basic code, the second is to describe in function as a command line already tap.
+This feature allow developers to describe how work they command line, just describing alls command line.
 
-Instead of coding, you have the choice to make it shorter as:
-
-```go
-cli.AddPatternCommand("hello", "This command get a hello world", HelloCommandHandler)
-```
-
-And then last and better way is to describe your commands and flags to  import as command logic tool as:
-
-```txt
-@commands:
-    hello
-    > This command get a simple hello world!
-```
-
-And make a bind to refer description code to an existing handler making:
+With this way, you defined specification about your CLI tools.
+Instead of coding, you have the choice to make it more readable as:
 
 ```go
-cli.BindCommand("command", HelloCommandHandler)
+cli.AddPatternCommand("hello", "This command get a hello world")    
 ```
 
-And we have the same result as previous use cases.
+We see here a command that named `hello` and his description. To implement this command, just bind it with your command handler:
+
+```go
+cli.BindCommand("hello", HelloCommandHandler)
+```
+
+And we have the same result as previous use case.
 
 ### Introduction
 
@@ -117,7 +150,7 @@ A command has it own pattern, and it composed of:
 - Command name
 - Argument name (only string parameter)
 - Flag name or tag
-- Description (for `help` command)
+- Description (used in `help` command)
 
 The structure of description pattern is simple, the first line is to define command line composition.
 
@@ -141,24 +174,25 @@ cli.AddPatternCommand("command -f1", "Command description for helping command")
 
 And a argument is not simple a location in command, it has name, default property, and take advantage of three features:
 
-**Optional argument** allow you to not declare argument value on command line, without return error.
+**Required argument** require you to indicate string argument:
+
+`[arg]`
+
+**Optional argument** allow you to not declare argument value on command line, without return error:
 
 `[?arg]`
 
-**Default argument value** can set default value to argument if it null.
+**Default argument value** can set default value to argument if it null:
 
 `[arg='default value']`
 
-**Argument as list** create a pattern that list string argument.
+**Argument as list** create a pattern that list string argument:
 
 `[arg...]`
 
-Or define minimum and/or maximum string using: `[arg min-max]`
+> Be carefull using **Argument as list**,  it has the same behaviour than `params...` golang syntax, except, by default is required if you not use **Optional argument**. So make this type as last argument of the command  else must panic.
 
-> Be carefull using **Argument as list**,  it has the same behaviour than `params...` golang syntax., and then, can be null by default. So make this type at last of a command because you can have **only one argument list by command**.
-
-> You can have multiple argument list seperate by command as `command [arg1...] subcommand [arg2...]`
-
+> You can have multiple argument list seperate by command as `command subcommand [?arg2...]`
 
 ### Flag
 
@@ -169,10 +203,14 @@ You can add flag definition as:
 cli.AddPatternFlag("flag | f1: string", "Flag one description as string")
 ```
 
-You can create you own flag logic registering an extractor as (who implements `FlagExtractor` interface):
+Use it into tapped command line:
 
-```go
-cli.RegisterFlagExtractor(&StringFlag{})
+```shell
+myapp hello --flag='flag text'
+# same as
+myapp hello --flag 'flag text'
+# same as
+myapp hello -f 'flag text'
 ```
 
 ### File description
@@ -180,8 +218,18 @@ cli.RegisterFlagExtractor(&StringFlag{})
 You can also create a documentation file use specific language to descibe your entirely application with:
 
 ```go
-cli := mural.From(io.Reader) // Output a cli importing file description
+cli, err := mural.From(io.Reader) // Output a cli importing file description
 ```
+<!-- Stop 1 -->
+```txt
+@commands:
+    hello
+    > This command get a simple hello world!
+```
+
+We see here a command that named `hello` with a simple description at next line starting with operator `>`.
+
+<!-- Stop 1 -->
 
 Then in this content, we have:
 
@@ -189,12 +237,16 @@ Then in this content, we have:
 @version: 1.12.3-pre
 @name: myapp
 
+@description:
+
+    A simple application
+
 @commands:
 
     command subcommand [arg1] [?arg2] --flag1 --flag2
     > Command description has coming soon
 
-    command command2 [arg1] nextcommant [arg2] -f1 -f2
+    command [arg1] nextcommand [arg2] -f1 -f2
     > Command for deleguate to next command value
 
 @flags:
@@ -207,6 +259,79 @@ Then in this content, we have:
 ```
 
 Operator `>` determine a description line.
+
+## Keywords references
+
+Mural use specific keyword corresponding to standard use and cannot be rewriting.
+Here a list and explanation of they use:
+
+- help flag `-h, --help`: return description of how use the CLI interface
+
+example:
+
+```txt
+$ myapp --help
+
+A simple application.
+
+Usage:
+  myapp [command]
+
+Available Commands:
+  hello       This command get a hello world
+
+Flags:
+  -f1, --flag1  string  Flag one description as string
+  -f2, --flag2          Flag two description as string
+
+Use "myapp [command] --help" for more information about a command.
+```
+
+And get with command help flag:
+
+```txt
+$ myapp command --help
+
+A simple application.
+
+Usage:
+  myapp command [arg1] [subcommand]
+
+Available Subcommands:
+  subcommand       Command for deleguate to next command value
+
+Flags:
+  -f1, --flag1  string  Flag one description as string
+  -f2, --flag2          Flag two description as string
+
+Use "myapp [command] --help" for more information about a command.
+```
+
+- version flag `-v, --version`: show the version of the CLI, can be templated to add multiple version information
+
+example: 
+```txt
+$ myapp --version
+  __  __                         
+ |  \/  |_   _  __ _ _ __  _ __  
+ | |\/| | | | |/ _` | '_ \| '_ \ 
+ | |  | | |_| | (_| | |_) | |_) |
+ |_|  |_|\__, |\__,_| .__/| .__/ 
+         |___/      |_|   |_|    
+
+Version: 1.12.3-alpha+6f8ca4bfb2
+OS: macOS 12.3
+Arch: arm64
+Device: Apple M1 Pro
+
+Dependancies                    Version
+------------------------------------------
+api-app                         1.32.2-release
+go                              1.19.3
+```
+
+- doc command `doc`:
+
 
 ## Architecture
 
@@ -226,7 +351,8 @@ Another is the binding information from description (example in `flag`) allow to
 - [Cobra](github.com/spf13/cobra) inspiration
 - [Description as code]() inspiration to [Terraform](terraform.io)
 - [Command line interface (CLI)]() composition and schema
+- [ASCII Art](https://patorjk.com/software/taag) generate ASCII Art from cli app name
 
 ## Author and contributor
 
-- [Jacques COFIS](github.com/jaokfys) Software engineer as **Owner**
+- [Jacques COFIS](github.com/jakofys) Software engineer as **Owner**
