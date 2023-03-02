@@ -2,7 +2,8 @@
     version: 1.12.3-alpha+6f8ca4bfb2
     name: myapp
     description: A simple application
-    
+    font-ascii: standard
+
 @commands:
 
     command command2 [arg1] [?arg2] --flag1 --flag2
@@ -14,13 +15,21 @@
     command [arg1...]
     > Command for deleguate to next command value
 
-@flags:
+@arguments:
 
-    flag1 | f1: string='message'
+    arg1
+    > Argument number 1
+
+    arg2
+    > Argument number 2
+
+@options:
+
+    --option1, -o: string='message'
     > Flag one description as string
 
-    unflag : string='message'
+    --option2 : string
     > Flag simple with no desc
 
-    flag2 | f2: bool=true
+    --option3, -O: bool=true
     > Flag two description as boolean with true as default value
