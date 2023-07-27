@@ -1,8 +1,9 @@
+
 @head:
-    version: 1.12.3-alpha+6f8ca4bfb2
-    name: myapp
-    description: A simple application
-    font-ascii: standard
+    version: '1.12.3-alpha+6f8ca4bfb2'
+    name: 'myapp'
+    description: 'A simple application'
+    font-encoder: 'ascii'
 
 @commands:
 
